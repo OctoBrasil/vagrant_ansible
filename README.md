@@ -1,6 +1,6 @@
 ### Vagrant & Ansible Project
 
-Vagrant project for the serie of articles - Environment Virtualization
+Vagrant project for the serie of articles - Environment Virtualization of Octo blog :fr:
 
 ### Version
 1.0.0
