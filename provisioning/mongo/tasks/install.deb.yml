@@ -1,0 +1,55 @@
+---
+
+- include_vars: "{{ansible_distribution}}.yml"
+
+- name: Check if running on systemd
+  command: cat /proc/1/cmdline
+  register: systemd
+  changed_when: false
+
+- name: Add systemd configuration if present
+  copy: src=mongodb.service dest=/lib/systemd/system/mongodb.service owner=root group=root mode=0640
+  when: "'systemd' in systemd.stdout"
+
+- name: Add symlink for systemd
+  file: src=/lib/systemd/system/mongodb.service dest=/etc/systemd/system/multi-user.target.wants/mongodb.service state=link
+  when: "'systemd' in systemd.stdout"
+  notify: reload systemd
+
+- meta: flush_handlers
+  when: "'systemd' in systemd.stdout"
+
+- name: Add APT key
+  apt_key: url="{{mongodb_apt_key_url}}" id="{{mongodb_apt_key_id}}"
+
+- name: Add APT repository
+  apt_repository: repo="{{mongodb_repository}}" update_cache=yes
+
+- name: Install MongoDB package
+  apt: name={{item}} state=present
+  with_items:
+    - "{{mongodb_package}}"
+    - numactl
+
+- name: Ensure dbpath directory
+  file: path={{mongodb_conf_dbpath}} state=directory owner=mongodb recurse=yes
+
+- name: reload systemd
+  shell: systemctl daemon-reload
+  changed_when: false
+  when: "'systemd' in systemd.stdout"
+
+- name: Install PyMongo package
+  apt: pkg=python-pymongo state=latest
+  when: not mongodb_pymongo_from_pip
+
+- name: Install PIP
+  apt: pkg={{ item }}
+  with_items:
+    - python-dev
+    - python-pip
+  when: mongodb_pymongo_from_pip
+
+- name: Install PyMongo from PIP
+  pip: name=pymongo version="{{ mongodb_pymongo_pip_version }}" state=present
+  when: mongodb_pymongo_from_pip
